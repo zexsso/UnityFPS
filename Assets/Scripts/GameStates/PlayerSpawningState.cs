@@ -15,7 +15,7 @@ public class PlayerSpawningState : StateNode
     {
         base.Enter(asServer);
 
-        if(!asServer) return;
+        if (!asServer) return;
 
         DespawnPlayers();
 
@@ -28,11 +28,12 @@ public class PlayerSpawningState : StateNode
         base.Exit(asServer);
     }
 
-    private List<PlayerHealth> SpawnPlayers(){
-        var spawnedPlayers  = new List<PlayerHealth>();
+    private List<PlayerHealth> SpawnPlayers()
+    {
+        var spawnedPlayers = new List<PlayerHealth>();
 
-        
-        int currentSpawnIndex = 0;  
+
+        int currentSpawnIndex = 0;
         foreach (var player in networkManager.players)
         {
             var spawnPoint = spawnPoints[currentSpawnIndex];

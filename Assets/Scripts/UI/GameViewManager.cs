@@ -8,7 +8,7 @@ public class GameViewManager : MonoBehaviour
     [SerializeField] private View defaultView;
 
     public void Awake()
-    {   
+    {
         InstanceHandler.RegisterInstance(this);
 
 
@@ -17,7 +17,7 @@ public class GameViewManager : MonoBehaviour
             HideViewInternal(view);
         }
         ShowViewInternal(defaultView);
-        
+
     }
 
     private void OnDestroy()
@@ -30,7 +30,7 @@ public class GameViewManager : MonoBehaviour
         foreach (var view in allViews)
         {
             if (view.GetType() == typeof(T)) ShowViewInternal(view);
-            else if(hideOthers) HideViewInternal(view);
+            else if (hideOthers) HideViewInternal(view);
         }
     }
 
@@ -40,7 +40,7 @@ public class GameViewManager : MonoBehaviour
         {
             if (view.GetType() == typeof(T)) HideViewInternal(view);
         }
-    }   
+    }
 
     private void ShowViewInternal(View view)
     {
@@ -53,7 +53,7 @@ public class GameViewManager : MonoBehaviour
         view.OnHide();
     }
 
-    
+
 
 }
 

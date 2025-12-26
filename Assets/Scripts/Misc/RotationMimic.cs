@@ -9,7 +9,7 @@ public class RotationMimic : NetworkBehaviour
     {
         base.OnSpawned();
         enabled = isOwner;
-    }   
+    }
 
     void Update()
     {

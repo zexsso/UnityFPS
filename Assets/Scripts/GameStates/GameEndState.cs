@@ -1,30 +1,62 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
 using PurrNet;
 using PurrNet.StateMachine;
 using UnityEngine;
+using System.Collections;
 
-public class GameEndState : StateNode<Dictionary<PlayerID, int>>
+public class GameEndState : StateNode
 {
-    public override void Enter(Dictionary<PlayerID, int> roundWins,bool asServer)
+    [SerializeField] private StateNode spawningState;
+    [SerializeField] private float gameRestartDelay = 5f;
+
+
+    public override void Enter(bool asServer)
     {
         base.Enter(asServer);
 
-        var winner = roundWins.First();
-
-
-        foreach (var player in roundWins)
+        if (!InstanceHandler.TryGetInstance(out ScoreManager scoreManager))
         {
-            if(player.Value > winner.Value) winner = player;
+            Debug.LogError("GameEndState failled to get Instance ScoreManager", this);
+            return;
         }
 
-        Debug.Log($"Game has ended with winner: {winner.Key} with {winner.Value} wins");
 
-        roundWins.Clear();
+        var winner = scoreManager.GetWinner();
+
+        if (winner == default)
+        {
+            Debug.LogError("GameEndState failled to get winner", this);
+            return;
+        }
+
+        Debug.Log($"Game now ended with {winner} as our champion");
+
+        if (!InstanceHandler.TryGetInstance(out EndGameView endGameView))
+        {
+            Debug.LogError("GameEndState failled to get Instance EndGameView", this);
+            return;
+        }
+
+        if (!InstanceHandler.TryGetInstance(out GameViewManager gameViewManager))
+        {
+            Debug.LogError("GameEndState failled to get Instance GameViewManager", this);
+            return;
+        }
+
+        endGameView.SetWinner(winner);
+        gameViewManager.ShowView<EndGameView>(false);
+
+
+        StartCoroutine(DelayedStateChange(gameViewManager));
 
         if (!asServer) return;
+    }
 
+    private IEnumerator DelayedStateChange(GameViewManager gameViewManager)
+    {
+        yield return new WaitForSeconds(gameRestartDelay);
+        gameViewManager.HideView<EndGameView>();
 
+        //TODO: reset score
+        machine.SetState(spawningState);
     }
 }

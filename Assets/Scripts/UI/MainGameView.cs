@@ -16,19 +16,21 @@ public class MainGameView : View
     {
         InstanceHandler.UnregisterInstance<MainGameView>();
     }
-    
+
     public override void OnHide()
     {
-       
+
     }
 
     public override void OnShow()
     {
-       
+
     }
 
     public void UpdateHealth(int health)
     {
+        if (health <= 0) health = 0;
         healthText.text = health.ToString();
+
     }
 }

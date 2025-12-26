@@ -4,27 +4,28 @@ using UnityEngine;
 
 public class PlayerHealth : NetworkBehaviour
 {
-  
-  [SerializeField] private int seltLayer, otherLayer;
+
+  [SerializeField] private int selfLayer, otherLayer;
   [SerializeField] private SyncVar<int> playerHealth = new(100);
 
   public int Health => playerHealth;
-  
+
   public Action<PlayerID> OnDeath_Server;
 
   protected override void OnSpawned()
   {
     base.OnSpawned();
 
-    var actualLayer = isOwner ? seltLayer : otherLayer; 
+    var actualLayer = isOwner ? selfLayer : otherLayer;
     SetLayerRecursive(gameObject, actualLayer);
 
-    if (isOwner) {
+    if (isOwner)
+    {
       Debug.Log($"PlayerHealth: OnSpawned {playerHealth.value}");
       InstanceHandler.GetInstance<MainGameView>().UpdateHealth(playerHealth.value);
       playerHealth.onChanged += OnHealthChanged;
     }
-  } 
+  }
 
   protected override void OnDestroy()
   {
@@ -38,7 +39,7 @@ public class PlayerHealth : NetworkBehaviour
     InstanceHandler.GetInstance<MainGameView>().UpdateHealth(newHealth);
   }
 
-    private void SetLayerRecursive(GameObject obj, int targetLayer)
+  private void SetLayerRecursive(GameObject obj, int targetLayer)
   {
     obj.layer = targetLayer;
 
@@ -49,11 +50,17 @@ public class PlayerHealth : NetworkBehaviour
   }
 
   [ServerRpc(requireOwnership: false)]
-  public void ChangeHealt(int amount)
+  public void ChangeHealt(int amount, RPCInfo info = default)
   {
     playerHealth.value += amount;
 
-    if (playerHealth.value <= 0) {
+    if (playerHealth.value <= 0)
+    {
+      if (InstanceHandler.TryGetInstance(out ScoreManager scoreManager))
+      {
+        scoreManager.AddKill(info.sender);
+        if (owner.HasValue) scoreManager.AddDeath(owner.Value);
+      }
       OnDeath_Server?.Invoke(owner.Value);
       Destroy(gameObject);
     }

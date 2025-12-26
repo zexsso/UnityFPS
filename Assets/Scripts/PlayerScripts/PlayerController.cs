@@ -3,30 +3,32 @@ using PurrNet;
 using Unity.Cinemachine;
 using UnityEngine;
 using UnityEngine.Rendering;
-using UnityEngine.UI;
 
 [RequireComponent(typeof(CharacterController))]
 public class PlayerController : NetworkBehaviour
 {
     [Header("Movement Settings")]
     [SerializeField] private float moveSpeed = 5f;
-    [SerializeField] private float sprintSpeed = 8f;
-    [SerializeField] private float jumpForce = 1f;
-    [SerializeField] private float gravity = -9.81f;
     [SerializeField] private float groundCheckDistance = 0.2f;
 
     [Header("Look Settings")]
-    [SerializeField] private float lookSensitivity = 2f;
+    [SerializeField] public float lookSensitivity = 1f;
     [SerializeField] private float maxLookAngle = 80f;
 
     [Header("References")]
     [SerializeField] private CinemachineCamera playerCamera;
-    [SerializeField] private  NetworkAnimator animator;
+    [SerializeField] private NetworkAnimator animator;
     [SerializeField] private List<Renderer> renderers = new();
-    
+
     private CharacterController characterController;
     private Vector3 velocity;
+    public static PlayerController LocalPlayer { get; private set; }
+
+    // Movements variables
     private float verticalRotation = 0f;
+    private readonly float gravity = -9.81f;
+    private readonly float jumpForce = 1f;
+
 
     protected override void OnSpawned()
     {
@@ -37,6 +39,8 @@ public class PlayerController : NetworkBehaviour
 
         if (isOwner)
         {
+            LocalPlayer = this;
+
             foreach (var rend in renderers)
             {
                 rend.shadowCastingMode = ShadowCastingMode.ShadowsOnly;
@@ -46,6 +50,8 @@ public class PlayerController : NetworkBehaviour
 
     private void OnDisable()
     {
+        if (!isOwner) return;
+
         Cursor.lockState = CursorLockMode.None;
         Cursor.visible = true;
     }
@@ -72,10 +78,8 @@ public class PlayerController : NetworkBehaviour
     private void HandleMovement()
     {
         bool isGrounded = IsGrounded();
-        if (isGrounded && velocity.y < 0)
-        {
-            velocity.y = -2f;
-        }
+        if (isGrounded) animator.SetBool("jump", false);
+        if (isGrounded && velocity.y < 0) velocity.y = -2f;
 
         float horizontal = Input.GetAxisRaw("Horizontal");
         float vertical = Input.GetAxisRaw("Vertical");
@@ -83,20 +87,25 @@ public class PlayerController : NetworkBehaviour
         Vector3 moveDirection = transform.right * horizontal + transform.forward * vertical;
         moveDirection = Vector3.ClampMagnitude(moveDirection, 1f);
 
-        float currentSpeed = Input.GetKey(KeyCode.LeftShift) ? sprintSpeed : moveSpeed;
-        characterController.Move(moveDirection * currentSpeed * Time.deltaTime);
+        characterController.Move(moveSpeed * Time.deltaTime * moveDirection);
 
+        // Movement animations
+        animator.SetFloat("vertical", vertical);
+        animator.SetFloat("horizontal", horizontal);
+
+        // Jump part
         if (Input.GetButtonDown("Jump") && isGrounded)
         {
             velocity.y = Mathf.Sqrt(jumpForce * -2f * gravity);
+            animator.SetBool("jump", true);
         }
-
         velocity.y += gravity * Time.deltaTime;
         characterController.Move(velocity * Time.deltaTime);
 
-        // handle animations
-        animator.SetFloat("vertical", vertical);
-        animator.SetFloat("horizontal", horizontal);
+
+        // Crouch part
+        if (Input.GetKeyDown(KeyCode.LeftShift)) animator.SetBool("crouch", true);
+        else if (Input.GetKeyUp(KeyCode.LeftShift)) animator.SetBool("crouch", false);
     }
 
     private void HandleRotation()
@@ -115,6 +124,12 @@ public class PlayerController : NetworkBehaviour
     {
         return Physics.Raycast(transform.position + Vector3.up * 0.03f, Vector3.down, groundCheckDistance);
     }
+
+    public void SetLookSensitivity(float newSensitivity)
+    {
+        lookSensitivity = newSensitivity;
+    }
+
 
 #if UNITY_EDITOR
     private void OnDrawGizmosSelected()
