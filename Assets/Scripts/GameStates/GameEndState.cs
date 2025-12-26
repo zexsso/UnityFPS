@@ -15,48 +15,49 @@ public class GameEndState : StateNode
 
         if (!InstanceHandler.TryGetInstance(out ScoreManager scoreManager))
         {
-            Debug.LogError("GameEndState failled to get Instance ScoreManager", this);
+            Debug.LogError("GameEndState failed to get Instance ScoreManager", this);
             return;
         }
-
 
         var winner = scoreManager.GetWinner();
 
         if (winner == default)
         {
-            Debug.LogError("GameEndState failled to get winner", this);
+            Debug.LogError("GameEndState failed to get winner", this);
             return;
         }
 
-        Debug.Log($"Game now ended with {winner} as our champion");
+        Debug.Log($"Game ended! Winner: {winner}");
 
         if (!InstanceHandler.TryGetInstance(out EndGameView endGameView))
         {
-            Debug.LogError("GameEndState failled to get Instance EndGameView", this);
+            Debug.LogError("GameEndState failed to get Instance EndGameView", this);
             return;
         }
 
         if (!InstanceHandler.TryGetInstance(out GameViewManager gameViewManager))
         {
-            Debug.LogError("GameEndState failled to get Instance GameViewManager", this);
+            Debug.LogError("GameEndState failed to get Instance GameViewManager", this);
             return;
         }
 
         endGameView.SetWinner(winner);
         gameViewManager.ShowView<EndGameView>(false);
 
-
-        StartCoroutine(DelayedStateChange(gameViewManager));
-
+        // Only server controls state transitions
         if (!asServer) return;
+
+        StartCoroutine(DelayedStateChange(gameViewManager, scoreManager));
     }
 
-    private IEnumerator DelayedStateChange(GameViewManager gameViewManager)
+    private IEnumerator DelayedStateChange(GameViewManager gameViewManager, ScoreManager scoreManager)
     {
         yield return new WaitForSeconds(gameRestartDelay);
         gameViewManager.HideView<EndGameView>();
 
-        //TODO: reset score
+        // Reset scores for new game
+        scoreManager.ResetScores();
+
         machine.SetState(spawningState);
     }
 }

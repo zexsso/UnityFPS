@@ -8,6 +8,8 @@ public class ScoreboardView : View
     [SerializeField] private ScoreboardEntry scoreboardEntryPrefab;
 
     private GameViewManager _gameViewManager;
+    private GameInput _gameInput;
+    private bool _wasScoreboardHeld;
 
     private void Awake()
     {
@@ -22,6 +24,7 @@ public class ScoreboardView : View
     private void Start()
     {
         _gameViewManager = InstanceHandler.GetInstance<GameViewManager>();
+        _gameInput = GameInput.Instance;
     }
 
     public void SetData(Dictionary<PlayerID, ScoreManager.ScoreData> data)
@@ -40,17 +43,33 @@ public class ScoreboardView : View
 
     private void Update()
     {
-        if (Input.GetKeyDown(KeyCode.Tab)) _gameViewManager.ShowView<ScoreboardView>(false);
-        if (Input.GetKeyUp(KeyCode.Tab)) _gameViewManager.HideView<ScoreboardView>();
+        if (_gameInput == null)
+        {
+            _gameInput = GameInput.Instance;
+            if (_gameInput == null) return;
+        }
+
+        bool isScoreboardHeld = _gameInput.ScoreboardHeld;
+
+        // Show on press
+        if (isScoreboardHeld && !_wasScoreboardHeld)
+        {
+            _gameViewManager.ShowView<ScoreboardView>(false);
+        }
+        // Hide on release
+        else if (!isScoreboardHeld && _wasScoreboardHeld)
+        {
+            _gameViewManager.HideView<ScoreboardView>();
+        }
+
+        _wasScoreboardHeld = isScoreboardHeld;
     }
 
     public override void OnHide()
     {
-
     }
 
     public override void OnShow()
     {
-
     }
 }

@@ -6,7 +6,6 @@ public class ScoreManager : NetworkBehaviour
 {
   [SerializeField] private SyncDictionary<PlayerID, ScoreData> scores = new();
 
-
   public void Awake()
   {
     InstanceHandler.RegisterInstance(this);
@@ -29,9 +28,30 @@ public class ScoreManager : NetworkBehaviour
     }
   }
 
+  public void AddKill(PlayerID killerId, PlayerID victimId, bool isHeadshot = false)
+  {
+    CheckForDictionaryEntry(killerId);
+
+    var myPlayer = scores[killerId];
+    myPlayer.kills++;
+    scores[killerId] = myPlayer;
+
+    // Broadcast kill to all clients for kill feed
+    BroadcastKill(killerId.id.ToString(), victimId.id.ToString(), isHeadshot);
+  }
+
+  [ObserversRpc]
+  private void BroadcastKill(string killerName, string victimName, bool isHeadshot)
+  {
+    if (InstanceHandler.TryGetInstance(out KillFeedView killFeed))
+    {
+      killFeed.AddKillEntry($"Player {killerName}", $"Player {victimName}", isHeadshot);
+    }
+  }
+
   public void AddKill(PlayerID playerId)
   {
-    CheckForDictionnaryEntry(playerId);
+    CheckForDictionaryEntry(playerId);
 
     var myPlayer = scores[playerId];
     myPlayer.kills++;
@@ -40,7 +60,7 @@ public class ScoreManager : NetworkBehaviour
 
   public void AddDeath(PlayerID playerId)
   {
-    CheckForDictionnaryEntry(playerId);
+    CheckForDictionaryEntry(playerId);
 
     var myPlayer = scores[playerId];
     myPlayer.deaths++;
@@ -64,9 +84,17 @@ public class ScoreManager : NetworkBehaviour
     return winner;
   }
 
-  public void CheckForDictionnaryEntry(PlayerID playerId)
+  public void CheckForDictionaryEntry(PlayerID playerId)
   {
     if (!scores.ContainsKey(playerId)) scores.Add(playerId, new ScoreData());
+  }
+
+  /// <summary>
+  /// Resets all player scores. Called when starting a new game.
+  /// </summary>
+  public void ResetScores()
+  {
+    scores.Clear();
   }
 
   public struct ScoreData

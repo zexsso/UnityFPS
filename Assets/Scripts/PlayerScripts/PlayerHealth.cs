@@ -50,7 +50,18 @@ public class PlayerHealth : NetworkBehaviour
   }
 
   [ServerRpc(requireOwnership: false)]
-  public void ChangeHealt(int amount, RPCInfo info = default)
+  public void ChangeHealth(int amount, RPCInfo info = default)
+  {
+    ChangeHealthInternal(amount, info.sender, false);
+  }
+
+  [ServerRpc(requireOwnership: false)]
+  public void ChangeHealthWithHeadshot(int amount, bool isHeadshot, RPCInfo info = default)
+  {
+    ChangeHealthInternal(amount, info.sender, isHeadshot);
+  }
+
+  private void ChangeHealthInternal(int amount, PlayerID attackerId, bool isHeadshot)
   {
     playerHealth.value += amount;
 
@@ -58,11 +69,29 @@ public class PlayerHealth : NetworkBehaviour
     {
       if (InstanceHandler.TryGetInstance(out ScoreManager scoreManager))
       {
-        scoreManager.AddKill(info.sender);
-        if (owner.HasValue) scoreManager.AddDeath(owner.Value);
+        if (owner.HasValue)
+        {
+          scoreManager.AddKill(attackerId, owner.Value, isHeadshot);
+          scoreManager.AddDeath(owner.Value);
+        }
       }
+
+      // Play death sound
+      if (AudioManager.Instance != null)
+      {
+        AudioManager.Instance.PlayDeath(transform.position);
+      }
+
       OnDeath_Server?.Invoke(owner.Value);
       Destroy(gameObject);
     }
+  }
+
+  /// <summary>
+  /// Resets health to max value. Called by server when respawning.
+  /// </summary>
+  public void ResetHealth()
+  {
+    playerHealth.value = 100;
   }
 }

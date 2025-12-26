@@ -33,23 +33,30 @@ public class Weapon : NetworkBehaviour
     private Vector3 _originalPosition;
     private Quaternion _originalRotation;
     private Coroutine _recoilCoroutine;
+    private GameInput _gameInput;
 
     private void Start()
     {
         _originalPosition = transform.localPosition;
         _originalRotation = transform.localRotation;
+        _gameInput = GameInput.Instance;
     }
-
-
 
     private void Update()
     {
-
         SetIkTargets();
 
         if (!isOwner) return;
 
-        if (automatic && !Input.GetKey(KeyCode.Mouse0) || !automatic && !Input.GetKeyDown(KeyCode.Mouse0)) return;
+        if (_gameInput == null)
+        {
+            _gameInput = GameInput.Instance;
+            if (_gameInput == null) return;
+        }
+
+        // Check fire input based on weapon type
+        bool shouldFire = automatic ? _gameInput.AttackHeld : _gameInput.AttackPressed;
+        if (!shouldFire) return;
 
         if (Time.unscaledTime < _lastFireTime + fireDelay && _lastFireTime != 0) return;
         _lastFireTime = Time.unscaledTime;
@@ -71,26 +78,58 @@ public class Weapon : NetworkBehaviour
 
         PlayerHit(playerHealth, playerHealth.transform.InverseTransformPoint(hit.point), hit.normal);
 
-        // int appliedDamage = 0; // TODO: change to damage
-        if (hit.collider.CompareTag("Head"))
+        // Apply damage - headshots deal more damage
+        bool isHeadshot = hit.collider.CompareTag("Head");
+        int appliedDamage = isHeadshot ? -hsDamage : -damage;
+        playerHealth.ChangeHealthWithHeadshot(appliedDamage, isHeadshot);
+
+        // Play hit marker sound (only for local player who fired)
+        if (AudioManager.Instance != null)
         {
-            Debug.Log("Headshot détecté !");
-            playerHealth.ChangeHealt(-hsDamage);
+            if (isHeadshot)
+            {
+                AudioManager.Instance.PlayHeadshot();
+            }
+            else
+            {
+                AudioManager.Instance.PlayHitMarker();
+            }
         }
-        Debug.Log($"Hit: {hit.transform.name}, {hitlayer.value}");
     }
 
     [ObserversRpc(runLocally: true)]
     private void PlayerHit(PlayerHealth player, Vector3 localPosition, Vector3 normal)
     {
-        if (playerHitEffect && player) Instantiate(playerHitEffect, player.transform.TransformPoint(localPosition), Quaternion.LookRotation(normal));
-    }
+        if (player == null) return;
 
+        Vector3 worldPosition = player.transform.TransformPoint(localPosition);
+        Quaternion rotation = Quaternion.LookRotation(normal);
+
+        // Try to use object pool, fallback to instantiate
+        if (EffectPoolManager.Instance != null)
+        {
+            EffectPoolManager.Instance.GetPlayerHitEffect(worldPosition, rotation);
+        }
+        else if (playerHitEffect != null)
+        {
+            Instantiate(playerHitEffect, worldPosition, rotation);
+        }
+    }
 
     [ObserversRpc(runLocally: true)]
     private void EnvironementHit(Vector3 position, Vector3 normal)
     {
-        if (environementHitEffect) Instantiate(environementHitEffect, position, Quaternion.LookRotation(normal));
+        Quaternion rotation = Quaternion.LookRotation(normal);
+
+        // Try to use object pool, fallback to instantiate
+        if (EffectPoolManager.Instance != null)
+        {
+            EffectPoolManager.Instance.GetEnvironmentHitEffect(position, rotation);
+        }
+        else if (environementHitEffect != null)
+        {
+            Instantiate(environementHitEffect, position, rotation);
+        }
     }
 
     private void SetIkTargets()
@@ -103,6 +142,12 @@ public class Weapon : NetworkBehaviour
     private void PlayShotEffect()
     {
         if (muzzleFlash) muzzleFlash.Play();
+
+        // Play weapon fire sound
+        if (AudioManager.Instance != null)
+        {
+            AudioManager.Instance.PlayWeaponFire(transform.position);
+        }
 
         if (_recoilCoroutine != null) StopCoroutine(_recoilCoroutine);
 

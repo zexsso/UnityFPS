@@ -9,11 +9,14 @@ public class PlayerController : NetworkBehaviour
 {
     [Header("Movement Settings")]
     [SerializeField] private float moveSpeed = 5f;
+    [SerializeField] private float sprintSpeedMultiplier = 1.5f;
     [SerializeField] private float groundCheckDistance = 0.2f;
 
     [Header("Look Settings")]
-    [SerializeField] public float lookSensitivity = 1f;
+    [SerializeField] private float lookSensitivity = 1f;
     [SerializeField] private float maxLookAngle = 80f;
+
+    public float LookSensitivity => lookSensitivity;
 
     [Header("References")]
     [SerializeField] private CinemachineCamera playerCamera;
@@ -22,9 +25,12 @@ public class PlayerController : NetworkBehaviour
 
     private CharacterController characterController;
     private Vector3 velocity;
+    private GameInput _gameInput;
+    private bool _isCrouching;
+
     public static PlayerController LocalPlayer { get; private set; }
 
-    // Movements variables
+    // Movement variables
     private float verticalRotation = 0f;
     private readonly float gravity = -9.81f;
     private readonly float jumpForce = 1f;
@@ -40,6 +46,9 @@ public class PlayerController : NetworkBehaviour
         if (isOwner)
         {
             LocalPlayer = this;
+
+            // Load saved sensitivity from PlayerPrefs
+            lookSensitivity = PlayerPrefs.GetFloat("MouseSensitivity", 1f);
 
             foreach (var rend in renderers)
             {
@@ -61,6 +70,7 @@ public class PlayerController : NetworkBehaviour
         Cursor.lockState = CursorLockMode.Locked;
         Cursor.visible = false;
         characterController = GetComponent<CharacterController>();
+        _gameInput = GameInput.Instance;
 
         if (playerCamera == null)
         {
@@ -71,6 +81,12 @@ public class PlayerController : NetworkBehaviour
 
     private void Update()
     {
+        if (_gameInput == null)
+        {
+            _gameInput = GameInput.Instance;
+            if (_gameInput == null) return;
+        }
+
         HandleMovement();
         HandleRotation();
     }
@@ -81,20 +97,24 @@ public class PlayerController : NetworkBehaviour
         if (isGrounded) animator.SetBool("jump", false);
         if (isGrounded && velocity.y < 0) velocity.y = -2f;
 
-        float horizontal = Input.GetAxisRaw("Horizontal");
-        float vertical = Input.GetAxisRaw("Vertical");
+        // Get input from new Input System
+        Vector2 moveInput = _gameInput.MoveInput;
+        float horizontal = moveInput.x;
+        float vertical = moveInput.y;
 
         Vector3 moveDirection = transform.right * horizontal + transform.forward * vertical;
         moveDirection = Vector3.ClampMagnitude(moveDirection, 1f);
 
-        characterController.Move(moveSpeed * Time.deltaTime * moveDirection);
+        // Apply sprint speed multiplier
+        float currentSpeed = _gameInput.SprintHeld && !_isCrouching ? moveSpeed * sprintSpeedMultiplier : moveSpeed;
+        characterController.Move(currentSpeed * Time.deltaTime * moveDirection);
 
         // Movement animations
         animator.SetFloat("vertical", vertical);
         animator.SetFloat("horizontal", horizontal);
 
-        // Jump part
-        if (Input.GetButtonDown("Jump") && isGrounded)
+        // Jump
+        if (_gameInput.JumpPressed && isGrounded)
         {
             velocity.y = Mathf.Sqrt(jumpForce * -2f * gravity);
             animator.SetBool("jump", true);
@@ -102,16 +122,19 @@ public class PlayerController : NetworkBehaviour
         velocity.y += gravity * Time.deltaTime;
         characterController.Move(velocity * Time.deltaTime);
 
-
-        // Crouch part
-        if (Input.GetKeyDown(KeyCode.LeftShift)) animator.SetBool("crouch", true);
-        else if (Input.GetKeyUp(KeyCode.LeftShift)) animator.SetBool("crouch", false);
+        // Crouch - toggle on press
+        if (_gameInput.CrouchPressed)
+        {
+            _isCrouching = !_isCrouching;
+            animator.SetBool("crouch", _isCrouching);
+        }
     }
 
     private void HandleRotation()
     {
-        float mouseX = Input.GetAxis("Mouse X") * lookSensitivity;
-        float mouseY = Input.GetAxis("Mouse Y") * lookSensitivity;
+        Vector2 lookInput = _gameInput.LookInput;
+        float mouseX = lookInput.x * lookSensitivity;
+        float mouseY = lookInput.y * lookSensitivity;
 
         verticalRotation -= mouseY;
         verticalRotation = Mathf.Clamp(verticalRotation, -maxLookAngle, maxLookAngle);

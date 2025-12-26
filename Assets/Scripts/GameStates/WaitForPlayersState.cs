@@ -20,8 +20,8 @@ public class WaitForPlayersState : StateNode
     {
         if (!InstanceHandler.TryGetInstance(out GameViewManager gameViewManager))
         {
-            Debug.LogError("WaitForPlayersState failled to get Instance GameViewManager", this);
-            yield return null;
+            Debug.LogError("WaitForPlayersState failed to get Instance GameViewManager", this);
+            yield break;
         }
         gameViewManager.ShowView<WaitingForPlayersView>(false);
 

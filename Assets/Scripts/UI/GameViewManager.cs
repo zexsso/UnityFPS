@@ -45,11 +45,16 @@ public class GameViewManager : MonoBehaviour
     private void ShowViewInternal(View view)
     {
         view.canvasGroup.alpha = 1;
+        view.canvasGroup.interactable = true;
+        view.canvasGroup.blocksRaycasts = true;
         view.OnShow();
     }
+
     private void HideViewInternal(View view)
     {
         view.canvasGroup.alpha = 0;
+        view.canvasGroup.interactable = false;
+        view.canvasGroup.blocksRaycasts = false;
         view.OnHide();
     }
 
